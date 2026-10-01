@@ -3,13 +3,13 @@
 # vpn.sh — connect a FortiGate IPsec conn (PSK + XAuth + email OTP) and stay
 # attached. Container entrypoint; the conn must exist in /etc/ipsec.conf.
 #
-# Usage: vpn.sh [conn]     (default: milize-vpn)   Ctrl+C disconnects.
+# Usage: vpn.sh <conn>      Ctrl+C disconnects.
 #
 # Type the emailed OTP within ~60s or FortiGate silently drops it.
 
 set -u
 
-CONN="${1:-milize-vpn}"
+CONN="${1:?usage: vpn.sh <conn>}"
 OTP_FILE=/etc/ipsec.otp          # the patched xauth plugin polls this path
 CHARON_LOG=/var/log/charon.log   # see Dockerfile (no journald in a container)
 

@@ -19,7 +19,8 @@ RUN git apply /xauth-email-token.patch \
     && ./configure --prefix=/usr --sysconfdir=/etc \
         --enable-unity --enable-xauth-generic --enable-openssl --enable-stroke \
     && make -j"$(nproc)" \
-    && make install DESTDIR=/out
+    && make install DESTDIR=/out \
+    && rm -rf /out/lib   # systemd units only; /lib is a symlink in the runtime image
 
 # --- runtime ---------------------------------------------------------------
 FROM ubuntu:22.04

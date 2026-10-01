@@ -1,72 +1,65 @@
-# FortiGate IPsec VPN trên Linux (Docker)
+# FortiGate IPsec VPN on Linux (Docker)
 
-Kết nối VPN FortiGate loại **IPsec + PSK + XAuth + OTP qua email** bằng một container.
-Không cần cài FortiClient hay strongSwan trên máy: image tự build strongSwan 6.0.5 kèm
-[bản vá OTP email](src/xauth-email-token.patch).
+Connect to a FortiGate VPN using **IPsec + PSK + XAuth + email OTP** in a container.
+No host installation of FortiClient or strongSwan is required: the image builds strongSwan 6.0.5 with
+an [email OTP patch](src/xauth-email-token.patch).
 
-## Dùng nhanh
+## Quick start
 
-1. **Tạo cấu hình** (copy từ file mẫu rồi điền thông tin do admin VPN cung cấp):
+1. **Create your configuration** (copy the examples and fill in the details provided by your VPN administrator):
    ```bash
    cp config/ipsec.conf.example    config/ipsec.conf
    cp config/ipsec.secrets.example config/ipsec.secrets
    chmod 600 config/ipsec.secrets
    ```
-   - `ipsec.conf`: IP gateway, username, tên profile (`conn ...`).
-   - `ipsec.secrets`: PSK và password của từng user.
-2. **Khai báo profile** trong `docker-compose.yml`: mỗi profile là một service, `command` là tên `conn`.
-3. **Dừng strongSwan trên máy** nếu đang chạy, tránh tranh port 500/4500: `sudo ipsec stop`
-4. **Kết nối**:
+   - `ipsec.conf`: gateway IP, username, and profile name (`conn ...`).
+   - `ipsec.secrets`: PSK and password for each user.
+2. **Name your profiles** using the `conn` blocks in `ipsec.conf` (the example includes `company-full` and `company-split`).
+3. **Stop strongSwan on the host** if it is running, to avoid conflicts on ports 500/4500: `sudo ipsec stop`
+4. **Connect**:
    ```bash
-   docker compose run --rm milize     # hoặc: docker compose run --rm anh
+   docker compose run --rm vpn <connection-name>     # example: docker compose run --rm vpn company-full
    ```
-   Khi hiện `OTP code (from email):`, mở email lấy mã và nhập **trong khoảng 60 giây**.
-   Thấy `✓ connected` là xong. **Ctrl+C để ngắt.**
+   When `OTP code (from email):` appears, check your email and enter the code **within about 60 seconds**.
+   Once you see `✓ connected`, you are connected. **Press Ctrl+C to disconnect.**
 
-Lần đầu `run` sẽ build image (vài phút).
+The first `run` builds the image, which takes a few minutes.
 
-## Kiểm tra đã đi qua VPN chưa
+## Verify that traffic goes through the VPN
 
 ```bash
-curl https://ifconfig.me     # phải ra IP của gateway, không phải IP nhà mạng
+curl https://ifconfig.me     # should show the gateway's IP, not your ISP's IP
 ```
-(Chỉ đúng với full tunnel `rightsubnet=0.0.0.0/0`. Split tunnel thì thử truy cập tài nguyên nội bộ.)
+(This only applies to a full tunnel with `rightsubnet=0.0.0.0/0`. For a split tunnel, try accessing an internal resource.)
 
-## Cấu trúc
+## Project structure
 
-| Đường dẫn | Vai trò |
+| Path | Purpose |
 |---|---|
-| `config/` | Cấu hình và secret của bạn, được mount vào container (không nằm trong image) |
-| `docker-compose.yml` | Mỗi service = một profile VPN, chạy một lần một profile |
-| `vpn.sh` | Entrypoint: chạy charon, hỏi OTP, giữ kết nối |
-| `Dockerfile` | Build strongSwan + patch, image cuối ~110MB |
-| `src/` | File patch OTP (từ repo `north3rnlights/strongswan-fortigate-email-2fa`) |
-| `backup/` | Các script cũ chạy trực tiếp trên máy, để tham khảo |
+| `config/` | Your configuration and secrets, mounted into the container (not included in the image) |
+| `docker-compose.yml` | A single `vpn` service; pass the `conn` name at runtime and run only one VPN at a time |
+| `vpn.sh` | Entrypoint: starts charon, prompts for the OTP, and keeps the connection alive |
+| `Dockerfile` | Builds strongSwan with the patch; the final image is approximately 110 MB |
+| `src/` | OTP patch (from `north3rnlights/strongswan-fortigate-email-2fa`) |
+| `backup/` | Legacy scripts for running directly on the host, kept locally for reference and excluded from Git |
 
-## Thêm profile mới
+## Add a new profile
 
-1. Thêm một khối `conn <tên>` vào `config/ipsec.conf` và một dòng `<user> : XAUTH "..."` vào `config/ipsec.secrets`.
-2. Thêm service vào `docker-compose.yml`:
-   ```yaml
-   congty-moi:
-     <<: *vpn
-     profiles: ["congty-moi"]
-     command: ["<tên conn>"]
-   ```
-3. Chạy `docker compose run --rm congty-moi`.
+1. Add a `conn <name>` block to `config/ipsec.conf` and a `<user> : XAUTH "..."` line to `config/ipsec.secrets`.
+2. Run `docker compose run --rm vpn <name>`. No changes to `docker-compose.yml` are needed.
 
-## Gặp lỗi
+## Troubleshooting
 
-| Hiện tượng | Nguyên nhân thường gặp |
+| Symptom | Common cause or action |
 |---|---|
-| `failed before OTP` | Sai PSK, username/password, hoặc thông số mã hóa (`ike=`/`esp=`) không khớp gateway. Xem 20 dòng log in ra. |
-| `no OTP challenge` | Gateway không gửi vòng OTP: sai profile hoặc tài khoản không bật 2FA email. |
-| Nhập OTP xong thất bại | Gõ chậm quá ~60 giây, mã bị bỏ qua. Chạy lại để nhận mã mới. |
-| Kết nối được nhưng IP vẫn là IP nhà mạng | Xem lại `vpn.sh` (rule NAT bypass) và subnet bridge Docker có trùng IP ảo VPN. |
-| Báo cổng 500/4500 bị chiếm | `sudo ipsec stop` trên máy host. |
+| `failed before OTP` | Incorrect PSK, username/password, or encryption settings (`ike=`/`esp=`) that do not match the gateway. Check the 20 log lines printed. |
+| `no OTP challenge` | The gateway did not send an OTP challenge: the profile is incorrect or email 2FA is not enabled for the account. |
+| Connection fails after entering the OTP | The code was entered too slowly (more than about 60 seconds) and was ignored. Run again to receive a new code. |
+| Connected, but the public IP is still your ISP's IP | Check `vpn.sh` (the NAT bypass rule) and whether the Docker bridge subnet overlaps the VPN's virtual IP range. |
+| Ports 500/4500 are already in use | Run `sudo ipsec stop` on the host. |
 
-## Lưu ý
+## Notes
 
-- Container chạy `network_mode: host` với `NET_ADMIN` nên VPN áp dụng cho **cả máy**.
-- Mỗi lần kết nối tốn một email OTP, không chạy lặp khi chưa cần.
-- Không commit `config/ipsec.secrets`.
+- The container uses `network_mode: host` with `NET_ADMIN`, so the VPN applies to **the entire host**.
+- Each connection attempt triggers an OTP email; avoid repeated attempts unless needed.
+- Never commit `config/ipsec.secrets`.
