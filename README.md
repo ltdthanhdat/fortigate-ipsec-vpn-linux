@@ -1,4 +1,4 @@
-# FortiGate IPsec VPN on Linux (Docker)
+# FortiGate IPsec VPN on Linux
 
 Connect to a FortiGate VPN using **IPsec + PSK + XAuth + email OTP** in a container.
 No host installation of FortiClient or strongSwan is required: the image builds strongSwan 6.0.5 with
