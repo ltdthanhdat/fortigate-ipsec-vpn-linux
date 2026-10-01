@@ -1,0 +1,47 @@
+# Copy to config/ipsec.conf and replace every <PLACEHOLDER>.
+# One "conn" per VPN profile; the conn name is what docker-compose.yml passes to vpn.sh.
+# Gateway, user and ciphers must match what the FortiGate admin configured.
+
+config setup
+
+# Example 1 — full tunnel: ALL traffic of this machine goes through the VPN.
+conn company-full
+    keyexchange=ikev1
+    aggressive=yes
+    authby=psk
+    left=%defaultroute
+    leftauth=psk
+    leftauth2=xauth               # username/password, then the emailed OTP
+    xauth_identity=<USERNAME>     # must have a matching line in ipsec.secrets
+    leftsourceip=%config          # ask the gateway for a virtual IP
+    right=<GATEWAY_IP>
+    rightauth=psk
+    rightsubnet=0.0.0.0/0         # full tunnel
+    ike=aes256-sha256-modp2048,aes128-sha256-modp2048!
+    esp=aes128-sha256-modp2048,aes256-sha256-modp2048!
+    keyingtries=1
+    dpdaction=none
+    closeaction=none
+    type=tunnel
+    auto=add
+
+# Example 2 — split tunnel: only the listed subnet(s) go through the VPN.
+conn company-split
+    keyexchange=ikev1
+    aggressive=yes
+    authby=psk
+    left=%defaultroute
+    leftauth=psk
+    leftauth2=xauth
+    xauth_identity=<OTHER_USERNAME>
+    leftsourceip=%config
+    right=<GATEWAY_IP>
+    rightauth=psk
+    rightsubnet=<10.0.0.0/16>     # your internal network(s), comma-separated
+    ike=aes256-sha256-modp2048,aes128-sha256-modp2048!
+    esp=aes128-sha256-modp2048,aes256-sha256-modp2048!
+    keyingtries=1
+    dpdaction=none
+    closeaction=none
+    type=tunnel
+    auto=add

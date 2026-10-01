@@ -1,0 +1,16 @@
+# Local backup scripts
+/backup/
+
+# Local VPN configuration and credentials
+/config/ipsec.conf
+/config/ipsec.secrets
+
+# Local environment, runtime files, and editor artifacts
+.env
+.env.*
+!.env.example
+*.log
+*.otp
+*.swp
+*~
+.DS_Store

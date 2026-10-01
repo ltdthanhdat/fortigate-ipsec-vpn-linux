@@ -1,0 +1,26 @@
+# One profile per VPN; run one at a time (they share the host network and
+# /etc/ipsec.otp). Interactive because you type the emailed OTP:
+#   docker compose run --rm milize     # or: docker compose run --rm anh
+x-vpn: &vpn
+  build: .
+  image: vpn
+  network_mode: host
+  cap_add: [NET_ADMIN]
+  init: true
+  stdin_open: true
+  tty: true
+  container_name: vpn   # same name for every profile -> a second one is refused
+  volumes:
+    - ./config/ipsec.conf:/etc/ipsec.conf:ro
+    - ./config/ipsec.secrets:/etc/ipsec.secrets:ro
+
+services:
+  milize:
+    <<: *vpn
+    profiles: ["milize"]
+    command: ["milize-vpn"]
+
+  anh:
+    <<: *vpn
+    profiles: ["anh"]
+    command: ["anh-nh-vpn"]
